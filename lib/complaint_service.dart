@@ -252,8 +252,9 @@ class ComplaintService {
   ) async {
     try {
       debugPrint('📊 Fetching stats for user: $email');
+      final encodedEmail = Uri.encodeComponent(email);
       final response = await http.get(
-        Uri.parse('$apiBaseUrl/api/stats/user/$email'),
+        Uri.parse('$apiBaseUrl/api/stats/user/$encodedEmail'),
       );
 
       if (response.statusCode == 200) {
@@ -267,6 +268,8 @@ class ComplaintService {
           'pending': data['pending'] as int,
         });
       } else {
+        debugPrint('❌ getUserStats failed with status: ${response.statusCode}');
+        debugPrint('Response body: ${response.body}');
         return ApiResponse.error('Failed to fetch user statistics');
       }
     } catch (e) {
