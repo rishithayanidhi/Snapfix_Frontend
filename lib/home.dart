@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -5,11 +6,12 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'auth.dart';
 import 'location_service.dart';
 import 'history.dart';
+import 'complaint_service.dart';
 
 final _secureStorage = const FlutterSecureStorage();
 
-// Placeholder ComplaintFormScreen widget
-class ComplaintFormScreen extends StatelessWidget {
+// Full-Featured ComplaintFormScreen
+class ComplaintFormScreen extends StatefulWidget {
   final String category;
   final Map<String, dynamic> userData;
 
@@ -20,29 +22,471 @@ class ComplaintFormScreen extends StatelessWidget {
   });
 
   @override
+  State<ComplaintFormScreen> createState() => _ComplaintFormScreenState();
+}
+
+class _ComplaintFormScreenState extends State<ComplaintFormScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _titleController = TextEditingController();
+  final _descriptionController = TextEditingController();
+
+  File? _selectedImage;
+  LocationData? _locationData;
+  bool _isLoadingLocation = false;
+  bool _isSubmitting = false;
+  String _urgency = 'Medium';
+
+  @override
+  void initState() {
+    super.initState();
+    _getLocation();
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _getLocation() async {
+    setState(() => _isLoadingLocation = true);
+    try {
+      final location = await LocationService.getCurrentLocationWithAddress();
+      if (mounted) {
+        setState(() {
+          _locationData = location;
+          _isLoadingLocation = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingLocation = false);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to get location: $e')));
+      }
+    }
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final photo = await picker.pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 1920,
+      );
+
+      if (photo != null) {
+        setState(() => _selectedImage = File(photo.path));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to pick image: $e')));
+      }
+    }
+  }
+
+  Future<void> _submitComplaint() async {
+    // Form validation
+    if (!_formKey.currentState!.validate()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Please fill in all required fields correctly'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Image validation
+    if (_selectedImage == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('📷 Please select an image of the issue'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Location validation
+    if (_locationData == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            '📍 Location not available. Please enable GPS and try again.',
+          ),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      // Get user data from secure storage
+      String userName = widget.userData['full_name'] ?? 'Anonymous';
+      String userEmail = widget.userData['email'] ?? '';
+
+      // If not available from widget, try secure storage
+      if (userName == 'Anonymous' || userEmail.isEmpty) {
+        userName = await _secureStorage.read(key: 'user_name') ?? 'Anonymous';
+        userEmail = await _secureStorage.read(key: 'user_email') ?? '';
+      }
+
+      print('📤 Submitting complaint:');
+      print('  Name: $userName');
+      print('  Email: $userEmail');
+      print('  Category: ${widget.category}');
+      print('  Title: ${_titleController.text.trim()}');
+      print('  Urgency: $_urgency');
+      print('  Location: ${_locationData!.address}');
+
+      final response = await ComplaintService.submitComplaint(
+        name: userName,
+        email: userEmail,
+        title: _titleController.text.trim(),
+        description: _descriptionController.text.trim(),
+        category: widget.category,
+        urgency: _urgency,
+        imageFile: _selectedImage!,
+        latitude: _locationData!.latitude,
+        longitude: _locationData!.longitude,
+        address: _locationData!.address,
+      );
+
+      // Check response success
+      if (!response.success || response.data == null) {
+        throw Exception(response.error ?? 'Unknown error occurred');
+      }
+
+      print('✅ Complaint submitted successfully: ${response.data!.id}');
+
+      if (mounted) {
+        Navigator.pop(context, true); // Return true to indicate success
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Complaint submitted successfully!\nID: ${response.data!.id.substring(0, 8)}',
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } on Exception catch (e) {
+      print('❌ Submission error: $e');
+      if (mounted) {
+        String errorMessage = 'Failed to submit complaint';
+
+        // Parse error message for user-friendly display
+        final errorStr = e.toString();
+        if (errorStr.contains('Network')) {
+          errorMessage = '🌐 Network error. Please check your connection.';
+        } else if (errorStr.contains('timeout')) {
+          errorMessage = '⏱️ Request timeout. Please try again.';
+        } else if (errorStr.contains('Invalid')) {
+          errorMessage = '⚠️ Invalid data. Please check all fields.';
+        } else if (errorStr.contains('401') || errorStr.contains('403')) {
+          errorMessage = '🔒 Authentication error. Please login again.';
+        } else if (errorStr.contains('500')) {
+          errorMessage = '⚠️ Server error. Please try again later.';
+        } else {
+          errorMessage = '❌ $errorStr';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: _submitComplaint,
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    print('🔍 DEBUG: ComplaintFormScreen building for ${widget.category}');
+    print('🔍 DEBUG: Location data: ${_locationData?.address ?? "null"}');
     return Scaffold(
       appBar: AppBar(
-        title: Text('$category Complaint'),
+        title: Text('${widget.category} Complaint'),
         backgroundColor: const Color(0xFF6366F1),
         foregroundColor: Colors.white,
+        elevation: 0,
       ),
-      body: const Center(
-        child: Padding(
-          padding: EdgeInsets.all(16.0),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Form(
+          key: _formKey,
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Icon(Icons.construction, size: 64, color: Color(0xFF6366F1)),
-              SizedBox(height: 16),
-              Text(
-                'Complaint Form',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              // Title Field
+              TextFormField(
+                controller: _titleController,
+                decoration: InputDecoration(
+                  labelText: 'Title',
+                  hintText: 'Brief description of the issue',
+                  prefixIcon: const Icon(Icons.title),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                validator: (val) => val == null || val.trim().isEmpty
+                    ? 'Title is required'
+                    : null,
               ),
-              SizedBox(height: 8),
-              Text(
-                'This feature is under development',
-                style: TextStyle(fontSize: 16, color: Colors.grey),
+              const SizedBox(height: 16),
+
+              // Description Field
+              TextFormField(
+                controller: _descriptionController,
+                maxLines: 5,
+                decoration: InputDecoration(
+                  labelText: 'Description',
+                  hintText: 'Describe the issue in detail',
+                  prefixIcon: const Icon(Icons.description),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                validator: (val) => val == null || val.trim().isEmpty
+                    ? 'Description is required'
+                    : null,
+              ),
+              const SizedBox(height: 16),
+
+              // Urgency Selector
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Urgency Level',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: ['Low', 'Medium', 'High', 'Critical']
+                          .map(
+                            (level) => ChoiceChip(
+                              label: Text(level),
+                              selected: _urgency == level,
+                              onSelected: (selected) {
+                                if (selected) {
+                                  setState(() => _urgency = level);
+                                }
+                              },
+                              selectedColor: const Color(0xFF6366F1),
+                              labelStyle: TextStyle(
+                                color: _urgency == level
+                                    ? Colors.white
+                                    : Colors.black87,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Image Picker
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    if (_selectedImage != null)
+                      Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.file(
+                              _selectedImage!,
+                              height: 200,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: IconButton(
+                              icon: const Icon(
+                                Icons.close,
+                                color: Colors.white,
+                              ),
+                              onPressed: () =>
+                                  setState(() => _selectedImage = null),
+                              style: IconButton.styleFrom(
+                                backgroundColor: Colors.black54,
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    else
+                      Column(
+                        children: [
+                          const Icon(
+                            Icons.add_photo_alternate,
+                            size: 48,
+                            color: Colors.grey,
+                          ),
+                          const SizedBox(height: 8),
+                          const Text('Add Photo Evidence'),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              ElevatedButton.icon(
+                                onPressed: () => _pickImage(ImageSource.camera),
+                                icon: const Icon(Icons.camera_alt),
+                                label: const Text('Camera'),
+                              ),
+                              ElevatedButton.icon(
+                                onPressed: () =>
+                                    _pickImage(ImageSource.gallery),
+                                icon: const Icon(Icons.photo_library),
+                                label: const Text('Gallery'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Location Display
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: _isLoadingLocation
+                    ? const Row(
+                        children: [
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          SizedBox(width: 12),
+                          Text('Getting location...'),
+                        ],
+                      )
+                    : _locationData != null
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.location_on,
+                                color: Color(0xFF6366F1),
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Location',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _locationData!.address,
+                            style: const TextStyle(fontSize: 13),
+                            maxLines: null, // Allow unlimited lines
+                            overflow: TextOverflow.visible, // Show full text
+                            softWrap: true, // Wrap to new lines
+                          ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          const Icon(Icons.location_off, color: Colors.red),
+                          const SizedBox(width: 8),
+                          const Expanded(child: Text('Location unavailable')),
+                          TextButton(
+                            onPressed: _getLocation,
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+              ),
+              const SizedBox(height: 24),
+
+              // Submit Button
+              ElevatedButton(
+                onPressed: _isSubmitting ? null : _submitComplaint,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6366F1),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: _isSubmitting
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text(
+                        'Submit Complaint',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
             ],
           ),
@@ -52,22 +496,65 @@ class ComplaintFormScreen extends StatelessWidget {
   }
 }
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   final Map<String, dynamic> userData;
 
   const HomePage({super.key, required this.userData});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  int _totalComplaints = 0;
+  int _resolvedComplaints = 0;
+  int _pendingComplaints = 0;
+  bool _isLoadingStats = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchStatistics();
+  }
+
+  Future<void> _fetchStatistics() async {
+    setState(() => _isLoadingStats = true);
+    try {
+      final response = await ComplaintService.getPublicStats();
+      if (response.success && response.data != null) {
+        setState(() {
+          _totalComplaints = response.data!['total']!;
+          _resolvedComplaints = response.data!['resolved']!;
+          _pendingComplaints = response.data!['pending']!;
+          _isLoadingStats = false;
+        });
+        debugPrint(
+          '📊 Stats loaded: $_totalComplaints total, $_resolvedComplaints resolved, $_pendingComplaints pending',
+        );
+      } else {
+        setState(() => _isLoadingStats = false);
+      }
+    } catch (e) {
+      setState(() => _isLoadingStats = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFE),
       body: SafeArea(
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            SliverToBoxAdapter(child: _buildHeader(context)),
-            SliverToBoxAdapter(child: _buildMainContent(context)),
-          ],
+        child: RefreshIndicator(
+          onRefresh: _fetchStatistics,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            slivers: [
+              SliverToBoxAdapter(child: _buildHeader(context)),
+              SliverToBoxAdapter(child: _buildMainContent(context)),
+            ],
+          ),
         ),
       ),
       floatingActionButton: _buildFab(context),
@@ -79,7 +566,7 @@ class HomePage extends StatelessWidget {
   // Header Section
   // --------------------------------------------------------------
   Widget _buildHeader(BuildContext context) {
-    final name = userData['full_name'] ?? 'User';
+    final name = widget.userData['full_name'] ?? 'User';
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(24),
@@ -202,15 +689,28 @@ class HomePage extends StatelessWidget {
       itemBuilder: (context, i) {
         final c = categories[i];
         return GestureDetector(
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ComplaintFormScreen(
-                category: c['title'] as String,
-                userData: userData,
+          onTap: () async {
+            print('🔍 DEBUG: Category tapped: ${c['title']}');
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) {
+                  print(
+                    '🔍 DEBUG: Building ComplaintFormScreen for ${c['title']}',
+                  );
+                  return ComplaintFormScreen(
+                    category: c['title'] as String,
+                    userData: widget.userData,
+                  );
+                },
               ),
-            ),
-          ),
+            );
+            // Refresh stats if complaint was successfully submitted
+            if (result == true) {
+              debugPrint('✅ Complaint submitted, refreshing stats...');
+              _fetchStatistics();
+            }
+          },
           child: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -251,7 +751,7 @@ class HomePage extends StatelessWidget {
   }
 
   // --------------------------------------------------------------
-  // Quick Stats (Placeholder for backend integration)
+  // Dynamic Stats from Database
   // --------------------------------------------------------------
   Widget _buildCommunityStats() {
     return Container(
@@ -267,34 +767,68 @@ class HomePage extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: const [
-          _StatCard(label: "Total", count: "106", color: Color(0xFF3B82F6)),
-          _StatCard(label: "Resolved", count: "78", color: Color(0xFF10B981)),
-          _StatCard(label: "Pending", count: "28", color: Color(0xFFF59E0B)),
-        ],
-      ),
+      child: _isLoadingStats
+          ? const Center(
+              child: Padding(
+                padding: EdgeInsets.all(20.0),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _StatCard(
+                  label: "Total",
+                  count: _totalComplaints.toString(),
+                  color: const Color(0xFF3B82F6),
+                ),
+                _StatCard(
+                  label: "Resolved",
+                  count: _resolvedComplaints.toString(),
+                  color: const Color(0xFF10B981),
+                ),
+                _StatCard(
+                  label: "Pending",
+                  count: _pendingComplaints.toString(),
+                  color: const Color(0xFFF59E0B),
+                ),
+              ],
+            ),
     );
   }
 
   // --------------------------------------------------------------
-  // Floating Action Button
+  // Report Issue Container (Static Display)
   // --------------------------------------------------------------
   Widget _buildFab(BuildContext context) {
-    return FloatingActionButton.extended(
-      onPressed: () => _openReportSheet(context),
-      backgroundColor: const Color(0xFF6366F1),
-      label: const Text('Report Issue', style: TextStyle(color: Colors.white)),
-      icon: const Icon(Icons.add_a_photo_rounded, color: Colors.white),
-    );
-  }
-
-  void _openReportSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const _ReportOptions(),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF6366F1),
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF6366F1).withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.add_a_photo_rounded, color: Colors.white, size: 24),
+          SizedBox(width: 12),
+          Text(
+            'Report Issue',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -365,97 +899,6 @@ class _StatCard extends StatelessWidget {
 }
 
 // --------------------------------------------------------------
-// BottomSheet for quick report options
 // --------------------------------------------------------------
-class _ReportOptions extends StatelessWidget {
-  const _ReportOptions();
-
-  Future<void> _captureAndSend(BuildContext context) async {
-    final picker = ImagePicker();
-    final photo = await picker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 85,
-    );
-    if (photo == null) return;
-
-    final location = await LocationService.getCurrentLocationWithAddress();
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            location != null
-                ? 'Photo captured at ${location.address}'
-                : 'Photo captured (no location)',
-          ),
-          backgroundColor: Colors.green,
-        ),
-      );
-    }
-  }
-
-  Future<void> _selectFromGallery(BuildContext context) async {
-    final picker = ImagePicker();
-    final photo = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 85,
-    );
-    if (photo == null) return;
-
-    final location = await LocationService.getCurrentLocationWithAddress();
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            location != null
-                ? 'Selected photo with location: ${location.address}'
-                : 'Selected photo (location unavailable)',
-          ),
-          backgroundColor: Colors.green,
-        ),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      padding: const EdgeInsets.all(24),
-      child: Wrap(
-        alignment: WrapAlignment.center,
-        children: [
-          Container(
-            height: 5,
-            width: 40,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(3),
-            ),
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'Report an Issue',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-          ),
-          const SizedBox(height: 20),
-          ListTile(
-            leading: const Icon(Icons.camera_alt_rounded, color: Colors.indigo),
-            title: const Text('Take Photo'),
-            onTap: () => _captureAndSend(context),
-          ),
-          ListTile(
-            leading: const Icon(
-              Icons.photo_library_rounded,
-              color: Colors.green,
-            ),
-            title: const Text('Choose from Gallery'),
-            onTap: () => _selectFromGallery(context),
-          ),
-        ],
-      ),
-    );
-  }
-}
+// (Report Options widget removed - button is now static display only)
+// --------------------------------------------------------------

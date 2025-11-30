@@ -84,11 +84,31 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _checkExistingSession() async {
     final token = await _secureStorage.read(key: 'access_token');
-    if (token != null && token.isNotEmpty && mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const HomePage(userData: {})),
-      );
+    if (token != null && token.isNotEmpty) {
+      // Verify token is still valid by fetching user data
+      try {
+        final response = await ApiClient.get(
+          '/auth/profile',
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        );
+
+        if (response.statusCode == 200 && mounted) {
+          final user = json.decode(response.body);
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => HomePage(userData: user)),
+          );
+        } else {
+          // Token invalid, clear it
+          await _secureStorage.delete(key: 'access_token');
+        }
+      } catch (e) {
+        // Network error or invalid token, clear it
+        await _secureStorage.delete(key: 'access_token');
+      }
     }
   }
 

@@ -177,9 +177,11 @@ class _SplashScreenState extends State<SplashScreen>
       setState(() => _status = 'Server unreachable ⚠️');
     }
 
-    await Future.delayed(const Duration(seconds: 2));
+    await Future.delayed(const Duration(seconds: 1));
 
     if (!mounted) return;
+
+    // Always go to login page - LoginPage will check for existing session
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => const LoginPage()),

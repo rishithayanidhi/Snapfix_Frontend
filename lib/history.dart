@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'complaint_service.dart';
 
 class HistoryDialog {
@@ -40,24 +42,41 @@ class _ComplaintHistoryDialogState extends State<_ComplaintHistoryDialog> {
     });
 
     try {
-      final response = await ComplaintService.getUserComplaints();
+      // Try to get user email from secure storage
+      final secureStorage = const FlutterSecureStorage();
+      final userEmail = await secureStorage.read(key: 'user_email');
+
+      ApiResponse<List<Complaint>> response;
+
+      if (userEmail != null && userEmail.isNotEmpty) {
+        // Fetch by email (works for both authenticated and unauthenticated users)
+        debugPrint('📧 Fetching complaints for email: $userEmail');
+        response = await ComplaintService.getComplaintsByEmail(userEmail);
+      } else {
+        // Fallback to authenticated endpoint
+        debugPrint('🔒 Fetching authenticated user complaints');
+        response = await ComplaintService.getUserComplaints();
+      }
 
       if (response.success && response.data != null) {
         setState(() {
           _complaints = response.data!;
           _isLoading = false;
         });
+        debugPrint('✅ Loaded ${_complaints.length} complaints');
       } else {
         setState(() {
           _errorMessage = response.error ?? 'Failed to fetch complaints.';
           _isLoading = false;
         });
+        debugPrint('❌ Error: $_errorMessage');
       }
     } catch (e) {
       setState(() {
         _errorMessage = 'Error: ${e.toString()}';
         _isLoading = false;
       });
+      debugPrint('❌ Exception: $e');
     }
   }
 
@@ -80,6 +99,21 @@ class _ComplaintHistoryDialogState extends State<_ComplaintHistoryDialog> {
         return Icons.pending_rounded;
       default:
         return Icons.error_outline_rounded;
+    }
+  }
+
+  Color _urgencyColor(String urgency) {
+    switch (urgency.toLowerCase()) {
+      case 'critical':
+        return Colors.red;
+      case 'high':
+        return Colors.orange;
+      case 'medium':
+        return Colors.amber;
+      case 'low':
+        return Colors.green;
+      default:
+        return Colors.grey;
     }
   }
 
@@ -221,8 +255,41 @@ class _ComplaintHistoryDialogState extends State<_ComplaintHistoryDialog> {
               fontSize: 13,
               height: 1.3,
             ),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 8),
+          if (complaint.urgency != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: _urgencyColor(complaint.urgency!).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: _urgencyColor(complaint.urgency!).withOpacity(0.3),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.priority_high_rounded,
+                    size: 14,
+                    color: _urgencyColor(complaint.urgency!),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    complaint.urgency!,
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: _urgencyColor(complaint.urgency!),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (complaint.urgency != null) const SizedBox(height: 8),
           if (complaint.locationAddress != null)
             Row(
               children: [

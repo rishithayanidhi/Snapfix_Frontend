@@ -49,3 +49,4 @@ flutter:
   # Asset folder (images, animations, JSON, etc.)
   assets:
     - assets/
+    - .env
