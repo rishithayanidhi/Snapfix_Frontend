@@ -38,17 +38,19 @@ class ApiCache {
 // 2️⃣  Backend health check
 // ===================================================
 
-Future<bool> checkBackendHealth({int retries = 3}) async {
+Future<bool> checkBackendHealth({int retries = 2}) async {
   for (int i = 0; i < retries; i++) {
     try {
       final resp = await http
           .get(Uri.parse('$apiBaseUrl/health'))
-          .timeout(const Duration(seconds: 3));
+          .timeout(const Duration(seconds: 2));
       if (resp.statusCode == 200) {
         return true;
       }
     } catch (_) {
-      await Future.delayed(const Duration(seconds: 1));
+      if (i < retries - 1) {
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
     }
   }
   return false;

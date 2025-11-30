@@ -1,8 +1,10 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'auth.dart';
 import 'location_service.dart';
 import 'history.dart';
@@ -140,13 +142,13 @@ class _ComplaintFormScreenState extends State<ComplaintFormScreen> {
         userEmail = await _secureStorage.read(key: 'user_email') ?? '';
       }
 
-      print('📤 Submitting complaint:');
-      print('  Name: $userName');
-      print('  Email: $userEmail');
-      print('  Category: ${widget.category}');
-      print('  Title: ${_titleController.text.trim()}');
-      print('  Urgency: $_urgency');
-      print('  Location: ${_locationData!.address}');
+      debugPrint('📤 Submitting complaint:');
+      debugPrint('  Name: $userName');
+      debugPrint('  Email: $userEmail');
+      debugPrint('  Category: ${widget.category}');
+      debugPrint('  Title: ${_titleController.text.trim()}');
+      debugPrint('  Urgency: $_urgency');
+      debugPrint('  Location: ${_locationData!.address}');
 
       final response = await ComplaintService.submitComplaint(
         name: userName,
@@ -166,7 +168,7 @@ class _ComplaintFormScreenState extends State<ComplaintFormScreen> {
         throw Exception(response.error ?? 'Unknown error occurred');
       }
 
-      print('✅ Complaint submitted successfully: ${response.data!.id}');
+      debugPrint('✅ Complaint submitted successfully: ${response.data!.id}');
 
       if (mounted) {
         Navigator.pop(context, true); // Return true to indicate success
@@ -189,7 +191,7 @@ class _ComplaintFormScreenState extends State<ComplaintFormScreen> {
         );
       }
     } on Exception catch (e) {
-      print('❌ Submission error: $e');
+      debugPrint('❌ Submission error: $e');
       if (mounted) {
         String errorMessage = 'Failed to submit complaint';
 
@@ -231,8 +233,8 @@ class _ComplaintFormScreenState extends State<ComplaintFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    print('🔍 DEBUG: ComplaintFormScreen building for ${widget.category}');
-    print('🔍 DEBUG: Location data: ${_locationData?.address ?? "null"}');
+    debugPrint('🔍 DEBUG: ComplaintFormScreen building for ${widget.category}');
+    debugPrint('🔍 DEBUG: Location data: ${_locationData?.address ?? "null"}');
     return Scaffold(
       appBar: AppBar(
         title: Text('${widget.category} Complaint'),
@@ -515,26 +517,67 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _fetchStatistics();
+    _loadUserDataIfEmpty();
+  }
+
+  Future<void> _loadUserDataIfEmpty() async {
+    // If userData is empty or doesn't have full_name, try loading from cache
+    if (widget.userData.isEmpty || widget.userData['full_name'] == null) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final cached = prefs.getString('cached_user_data');
+        if (cached != null) {
+          final cachedData = json.decode(cached);
+          debugPrint('👤 HOME: Loaded cached user data: $cachedData');
+          // Update widget.userData with cached data
+          // Note: Can't update widget.userData directly, need to rebuild with new data
+        }
+      } catch (e) {
+        debugPrint('👤 HOME: Failed to load cached data: $e');
+      }
+    }
   }
 
   Future<void> _fetchStatistics() async {
     setState(() => _isLoadingStats = true);
     try {
-      final response = await ComplaintService.getPublicStats();
-      if (response.success && response.data != null) {
-        setState(() {
-          _totalComplaints = response.data!['total']!;
-          _resolvedComplaints = response.data!['resolved']!;
-          _pendingComplaints = response.data!['pending']!;
-          _isLoadingStats = false;
-        });
-        debugPrint(
-          '📊 Stats loaded: $_totalComplaints total, $_resolvedComplaints resolved, $_pendingComplaints pending',
-        );
+      // Get user email from secure storage
+      final userEmail = await _secureStorage.read(key: 'user_email');
+
+      if (userEmail != null && userEmail.isNotEmpty) {
+        // Fetch user-specific statistics
+        debugPrint('📊 Fetching user-specific stats for: $userEmail');
+        final response = await ComplaintService.getUserStats(userEmail);
+        if (response.success && response.data != null) {
+          setState(() {
+            _totalComplaints = response.data!['total']!;
+            _resolvedComplaints = response.data!['resolved']!;
+            _pendingComplaints = response.data!['pending']!;
+            _isLoadingStats = false;
+          });
+          debugPrint(
+            '📊 User Stats: $_totalComplaints total, $_resolvedComplaints resolved, $_pendingComplaints pending',
+          );
+        } else {
+          setState(() => _isLoadingStats = false);
+        }
       } else {
-        setState(() => _isLoadingStats = false);
+        // Fallback to public stats if no user email
+        debugPrint('📊 No user email found, fetching public stats');
+        final response = await ComplaintService.getPublicStats();
+        if (response.success && response.data != null) {
+          setState(() {
+            _totalComplaints = response.data!['total']!;
+            _resolvedComplaints = response.data!['resolved']!;
+            _pendingComplaints = response.data!['pending']!;
+            _isLoadingStats = false;
+          });
+        } else {
+          setState(() => _isLoadingStats = false);
+        }
       }
     } catch (e) {
+      debugPrint('❌ Error fetching statistics: $e');
       setState(() => _isLoadingStats = false);
     }
   }
@@ -566,7 +609,11 @@ class _HomePageState extends State<HomePage> {
   // Header Section
   // --------------------------------------------------------------
   Widget _buildHeader(BuildContext context) {
+    debugPrint('============================================');
+    debugPrint('👤 HOME: userData received: ${widget.userData}');
     final name = widget.userData['full_name'] ?? 'User';
+    debugPrint('👤 HOME: Displaying name: $name');
+    debugPrint('============================================');
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(24),
@@ -690,12 +737,12 @@ class _HomePageState extends State<HomePage> {
         final c = categories[i];
         return GestureDetector(
           onTap: () async {
-            print('🔍 DEBUG: Category tapped: ${c['title']}');
+            debugPrint('🔍 DEBUG: Category tapped: ${c['title']}');
             final result = await Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (_) {
-                  print(
+                  debugPrint(
                     '🔍 DEBUG: Building ComplaintFormScreen for ${c['title']}',
                   );
                   return ComplaintFormScreen(
@@ -808,7 +855,7 @@ class _HomePageState extends State<HomePage> {
         borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF6366F1).withOpacity(0.3),
+            color: const Color(0xFF6366F1).withValues(alpha: 0.3),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),

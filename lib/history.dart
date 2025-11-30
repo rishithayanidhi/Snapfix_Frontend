@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -263,10 +262,12 @@ class _ComplaintHistoryDialogState extends State<_ComplaintHistoryDialog> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: _urgencyColor(complaint.urgency!).withOpacity(0.1),
+                color: _urgencyColor(complaint.urgency!).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
-                  color: _urgencyColor(complaint.urgency!).withOpacity(0.3),
+                  color: _urgencyColor(
+                    complaint.urgency!,
+                  ).withValues(alpha: 0.3),
                 ),
               ),
               child: Row(

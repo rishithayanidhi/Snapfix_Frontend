@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'main.dart'; // apiBaseUrl, ApiClient
 import 'home.dart';
 
@@ -84,31 +85,80 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _checkExistingSession() async {
     final token = await _secureStorage.read(key: 'access_token');
+    debugPrint('============================================');
+    debugPrint(
+      '🔐 AUTH: Checking session - Token exists: ${token != null && token.isNotEmpty}',
+    );
+    debugPrint('============================================');
+
     if (token != null && token.isNotEmpty) {
       // Verify token is still valid by fetching user data
       try {
-        final response = await ApiClient.get(
-          '/auth/profile',
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-          },
-        );
+        debugPrint('🔐 AUTH: Verifying token with /auth/profile...');
+        final response =
+            await ApiClient.get(
+              '/auth/profile',
+              headers: {
+                'Authorization': 'Bearer $token',
+                'Content-Type': 'application/json',
+              },
+            ).timeout(
+              const Duration(seconds: 5),
+              onTimeout: () {
+                throw Exception('Connection timeout - server unreachable');
+              },
+            );
+
+        debugPrint('🔐 AUTH: Profile response status: ${response.statusCode}');
+        debugPrint('🔐 AUTH: Response body: ${response.body}');
 
         if (response.statusCode == 200 && mounted) {
           final user = json.decode(response.body);
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => HomePage(userData: user)),
+          debugPrint('🔐 AUTH: Parsed user data: $user');
+          debugPrint('🔐 AUTH: Full name from response: ${user['full_name']}');
+
+          // Cache user data in SharedPreferences
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('cached_user_data', json.encode(user));
+            debugPrint('🔐 AUTH: Cached user data successfully');
+          } catch (e) {
+            debugPrint('🔐 AUTH: Failed to cache user data: $e');
+          }
+
+          // Store user email and name for complaint filtering
+          await _secureStorage.write(
+            key: 'user_email',
+            value: user['email'] ?? '',
           );
+          await _secureStorage.write(
+            key: 'user_name',
+            value: user['full_name'] ?? '',
+          );
+          debugPrint('🔐 AUTH: Stored user email and name for filtering');
+
+          debugPrint('🔐 AUTH: Navigating to HomePage with userData');
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => HomePage(userData: user)),
+            );
+          }
         } else {
           // Token invalid, clear it
+          debugPrint(
+            '🔐 AUTH: Invalid token (status ${response.statusCode}), clearing session',
+          );
           await _secureStorage.delete(key: 'access_token');
         }
       } catch (e) {
         // Network error or invalid token, clear it
+        debugPrint('🔐 AUTH: Error checking session: $e - clearing token');
         await _secureStorage.delete(key: 'access_token');
       }
+    } else {
+      debugPrint('🔐 AUTH: No existing session, showing login form');
+      debugPrint('============================================');
     }
   }
 
@@ -134,6 +184,24 @@ class _LoginPageState extends State<LoginPage> {
 
         // Securely store token
         await _secureStorage.write(key: 'access_token', value: token);
+
+        // Store user email and name for complaint filtering
+        await _secureStorage.write(
+          key: 'user_email',
+          value: user['email'] ?? '',
+        );
+        await _secureStorage.write(
+          key: 'user_name',
+          value: user['full_name'] ?? '',
+        );
+
+        // Cache user data
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('cached_user_data', json.encode(user));
+        } catch (e) {
+          debugPrint('Failed to cache user data: $e');
+        }
 
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -338,7 +406,19 @@ class _SignUpPageState extends State<SignUpPage> {
       if (response.statusCode == 201) {
         final data = json.decode(response.body);
         final token = data['access_token'] ?? '';
+        final user = data['user'] ?? {};
+
         await _secureStorage.write(key: 'access_token', value: token);
+
+        // Store user email and name for complaint filtering
+        await _secureStorage.write(
+          key: 'user_email',
+          value: user['email'] ?? emailController.text.trim(),
+        );
+        await _secureStorage.write(
+          key: 'user_name',
+          value: user['full_name'] ?? nameController.text.trim(),
+        );
 
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(

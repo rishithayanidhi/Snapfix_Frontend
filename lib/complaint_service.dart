@@ -246,6 +246,35 @@ class ComplaintService {
     }
   }
 
+  // Get user-specific statistics by email
+  static Future<ApiResponse<Map<String, int>>> getUserStats(
+    String email,
+  ) async {
+    try {
+      debugPrint('📊 Fetching stats for user: $email');
+      final response = await http.get(
+        Uri.parse('$apiBaseUrl/api/stats/user/$email'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        debugPrint(
+          '✅ User stats: ${data['total']} total, ${data['resolved']} resolved, ${data['pending']} pending',
+        );
+        return ApiResponse.success({
+          'total': data['total'] as int,
+          'resolved': data['resolved'] as int,
+          'pending': data['pending'] as int,
+        });
+      } else {
+        return ApiResponse.error('Failed to fetch user statistics');
+      }
+    } catch (e) {
+      debugPrint('❌ getUserStats error: $e');
+      return ApiResponse.error(e.toString());
+    }
+  }
+
   static Future<ApiResponse<Complaint>> getComplaint(String id) async {
     try {
       final headers = await _getAuthHeaders();
