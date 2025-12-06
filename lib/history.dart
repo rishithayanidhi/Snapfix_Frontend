@@ -49,11 +49,11 @@ class _ComplaintHistoryDialogState extends State<_ComplaintHistoryDialog> {
 
       if (userEmail != null && userEmail.isNotEmpty) {
         // Fetch by email (works for both authenticated and unauthenticated users)
-        debugPrint('📧 Fetching complaints for email: $userEmail');
+        debugPrint(' Fetching complaints for email: $userEmail');
         response = await ComplaintService.getComplaintsByEmail(userEmail);
       } else {
         // Fallback to authenticated endpoint
-        debugPrint('🔒 Fetching authenticated user complaints');
+        debugPrint(' Fetching authenticated user complaints');
         response = await ComplaintService.getUserComplaints();
       }
 
@@ -62,20 +62,20 @@ class _ComplaintHistoryDialogState extends State<_ComplaintHistoryDialog> {
           _complaints = response.data!;
           _isLoading = false;
         });
-        debugPrint('✅ Loaded ${_complaints.length} complaints');
+        debugPrint(' Loaded ${_complaints.length} complaints');
       } else {
         setState(() {
           _errorMessage = response.error ?? 'Failed to fetch complaints.';
           _isLoading = false;
         });
-        debugPrint('❌ Error: $_errorMessage');
+        debugPrint(' Error: $_errorMessage');
       }
     } catch (e) {
       setState(() {
         _errorMessage = 'Error: ${e.toString()}';
         _isLoading = false;
       });
-      debugPrint('❌ Exception: $e');
+      debugPrint(' Exception: $e');
     }
   }
 

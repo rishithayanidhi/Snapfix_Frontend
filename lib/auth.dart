@@ -87,14 +87,14 @@ class _LoginPageState extends State<LoginPage> {
     final token = await _secureStorage.read(key: 'access_token');
     debugPrint('============================================');
     debugPrint(
-      '🔐 AUTH: Checking session - Token exists: ${token != null && token.isNotEmpty}',
+      ' AUTH: Checking session - Token exists: ${token != null && token.isNotEmpty}',
     );
     debugPrint('============================================');
 
     if (token != null && token.isNotEmpty) {
       // Verify token is still valid by fetching user data
       try {
-        debugPrint('🔐 AUTH: Verifying token with /auth/profile...');
+        debugPrint(' AUTH: Verifying token with /auth/profile...');
         final response =
             await ApiClient.get(
               '/auth/profile',
@@ -109,21 +109,21 @@ class _LoginPageState extends State<LoginPage> {
               },
             );
 
-        debugPrint('🔐 AUTH: Profile response status: ${response.statusCode}');
-        debugPrint('🔐 AUTH: Response body: ${response.body}');
+        debugPrint(' AUTH: Profile response status: ${response.statusCode}');
+        debugPrint(' AUTH: Response body: ${response.body}');
 
         if (response.statusCode == 200 && mounted) {
           final user = json.decode(response.body);
-          debugPrint('🔐 AUTH: Parsed user data: $user');
-          debugPrint('🔐 AUTH: Full name from response: ${user['full_name']}');
+          debugPrint(' AUTH: Parsed user data: $user');
+          debugPrint(' AUTH: Full name from response: ${user['full_name']}');
 
           // Cache user data in SharedPreferences
           try {
             final prefs = await SharedPreferences.getInstance();
             await prefs.setString('cached_user_data', json.encode(user));
-            debugPrint('🔐 AUTH: Cached user data successfully');
+            debugPrint(' AUTH: Cached user data successfully');
           } catch (e) {
-            debugPrint('🔐 AUTH: Failed to cache user data: $e');
+            debugPrint(' AUTH: Failed to cache user data: $e');
           }
 
           // Store user email and name for complaint filtering
@@ -135,9 +135,9 @@ class _LoginPageState extends State<LoginPage> {
             key: 'user_name',
             value: user['full_name'] ?? '',
           );
-          debugPrint('🔐 AUTH: Stored user email and name for filtering');
+          debugPrint(' AUTH: Stored user email and name for filtering');
 
-          debugPrint('🔐 AUTH: Navigating to HomePage with userData');
+          debugPrint(' AUTH: Navigating to HomePage with userData');
           if (mounted) {
             Navigator.pushReplacement(
               context,
@@ -147,17 +147,17 @@ class _LoginPageState extends State<LoginPage> {
         } else {
           // Token invalid, clear it
           debugPrint(
-            '🔐 AUTH: Invalid token (status ${response.statusCode}), clearing session',
+            ' AUTH: Invalid token (status ${response.statusCode}), clearing session',
           );
           await _secureStorage.delete(key: 'access_token');
         }
       } catch (e) {
         // Network error or invalid token, clear it
-        debugPrint('🔐 AUTH: Error checking session: $e - clearing token');
+        debugPrint(' AUTH: Error checking session: $e - clearing token');
         await _secureStorage.delete(key: 'access_token');
       }
     } else {
-      debugPrint('🔐 AUTH: No existing session, showing login form');
+      debugPrint(' AUTH: No existing session, showing login form');
       debugPrint('============================================');
     }
   }
@@ -274,7 +274,7 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           const SizedBox(height: 15),
                           const Text(
-                            "Welcome Back 👋",
+                            "Welcome Back ",
                             style: TextStyle(
                               fontSize: 26,
                               fontWeight: FontWeight.bold,

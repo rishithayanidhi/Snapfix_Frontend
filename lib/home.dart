@@ -97,7 +97,7 @@ class _ComplaintFormScreenState extends State<ComplaintFormScreen> {
     if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('⚠️ Please fill in all required fields correctly'),
+          content: Text(' Please fill in all required fields correctly'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -108,7 +108,7 @@ class _ComplaintFormScreenState extends State<ComplaintFormScreen> {
     if (_selectedImage == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('📷 Please select an image of the issue'),
+          content: Text(' Please select an image of the issue'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -120,7 +120,7 @@ class _ComplaintFormScreenState extends State<ComplaintFormScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            '📍 Location not available. Please enable GPS and try again.',
+            ' Location not available. Please enable GPS and try again.',
           ),
           backgroundColor: Colors.orange,
           duration: Duration(seconds: 3),
@@ -142,7 +142,7 @@ class _ComplaintFormScreenState extends State<ComplaintFormScreen> {
         userEmail = await _secureStorage.read(key: 'user_email') ?? '';
       }
 
-      debugPrint('📤 Submitting complaint:');
+      debugPrint(' Submitting complaint:');
       debugPrint('  Name: $userName');
       debugPrint('  Email: $userEmail');
       debugPrint('  Category: ${widget.category}');
@@ -168,7 +168,7 @@ class _ComplaintFormScreenState extends State<ComplaintFormScreen> {
         throw Exception(response.error ?? 'Unknown error occurred');
       }
 
-      debugPrint('✅ Complaint submitted successfully: ${response.data!.id}');
+      debugPrint(' Complaint submitted successfully: ${response.data!.id}');
 
       if (mounted) {
         Navigator.pop(context, true); // Return true to indicate success
@@ -191,24 +191,24 @@ class _ComplaintFormScreenState extends State<ComplaintFormScreen> {
         );
       }
     } on Exception catch (e) {
-      debugPrint('❌ Submission error: $e');
+      debugPrint(' Submission error: $e');
       if (mounted) {
         String errorMessage = 'Failed to submit complaint';
 
         // Parse error message for user-friendly display
         final errorStr = e.toString();
         if (errorStr.contains('Network')) {
-          errorMessage = '🌐 Network error. Please check your connection.';
+          errorMessage = ' Network error. Please check your connection.';
         } else if (errorStr.contains('timeout')) {
-          errorMessage = '⏱️ Request timeout. Please try again.';
+          errorMessage = '⏱ Request timeout. Please try again.';
         } else if (errorStr.contains('Invalid')) {
-          errorMessage = '⚠️ Invalid data. Please check all fields.';
+          errorMessage = ' Invalid data. Please check all fields.';
         } else if (errorStr.contains('401') || errorStr.contains('403')) {
-          errorMessage = '🔒 Authentication error. Please login again.';
+          errorMessage = ' Authentication error. Please login again.';
         } else if (errorStr.contains('500')) {
-          errorMessage = '⚠️ Server error. Please try again later.';
+          errorMessage = ' Server error. Please try again later.';
         } else {
-          errorMessage = '❌ $errorStr';
+          errorMessage = ' $errorStr';
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -233,8 +233,8 @@ class _ComplaintFormScreenState extends State<ComplaintFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('🔍 DEBUG: ComplaintFormScreen building for ${widget.category}');
-    debugPrint('🔍 DEBUG: Location data: ${_locationData?.address ?? "null"}');
+    debugPrint(' DEBUG: ComplaintFormScreen building for ${widget.category}');
+    debugPrint(' DEBUG: Location data: ${_locationData?.address ?? "null"}');
     return Scaffold(
       appBar: AppBar(
         title: Text('${widget.category} Complaint'),
@@ -529,12 +529,12 @@ class _HomePageState extends State<HomePage> {
         final cached = prefs.getString('cached_user_data');
         if (cached != null) {
           final cachedData = json.decode(cached);
-          debugPrint('👤 HOME: Loaded cached user data: $cachedData');
+          debugPrint(' HOME: Loaded cached user data: $cachedData');
           // Update widget.userData with cached data
           // Note: Can't update widget.userData directly, need to rebuild with new data
         }
       } catch (e) {
-        debugPrint('👤 HOME: Failed to load cached data: $e');
+        debugPrint(' HOME: Failed to load cached data: $e');
       }
     }
   }
@@ -547,7 +547,7 @@ class _HomePageState extends State<HomePage> {
 
       if (userEmail != null && userEmail.isNotEmpty) {
         // Fetch user-specific statistics
-        debugPrint('📊 Fetching user-specific stats for: $userEmail');
+        debugPrint(' Fetching user-specific stats for: $userEmail');
         final response = await ComplaintService.getUserStats(userEmail);
         if (response.success && response.data != null) {
           setState(() {
@@ -558,14 +558,14 @@ class _HomePageState extends State<HomePage> {
             _isLoadingStats = false;
           });
           debugPrint(
-            '📊 User Stats: $_totalComplaints total, $_approvedComplaints approved, $_rejectedComplaints rejected, $_pendingComplaints pending',
+            ' User Stats: $_totalComplaints total, $_approvedComplaints approved, $_rejectedComplaints rejected, $_pendingComplaints pending',
           );
         } else {
           setState(() => _isLoadingStats = false);
         }
       } else {
         // Fallback to public stats if no user email
-        debugPrint('📊 No user email found, fetching public stats');
+        debugPrint(' No user email found, fetching public stats');
         final response = await ComplaintService.getPublicStats();
         if (response.success && response.data != null) {
           setState(() {
@@ -580,7 +580,7 @@ class _HomePageState extends State<HomePage> {
         }
       }
     } catch (e) {
-      debugPrint('❌ Error fetching statistics: $e');
+      debugPrint(' Error fetching statistics: $e');
       setState(() => _isLoadingStats = false);
     }
   }
@@ -613,9 +613,9 @@ class _HomePageState extends State<HomePage> {
   // --------------------------------------------------------------
   Widget _buildHeader(BuildContext context) {
     debugPrint('============================================');
-    debugPrint('👤 HOME: userData received: ${widget.userData}');
+    debugPrint(' HOME: userData received: ${widget.userData}');
     final name = widget.userData['full_name'] ?? 'User';
-    debugPrint('👤 HOME: Displaying name: $name');
+    debugPrint(' HOME: Displaying name: $name');
     debugPrint('============================================');
     return Container(
       margin: const EdgeInsets.all(16),
@@ -655,7 +655,7 @@ class _HomePageState extends State<HomePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Hello, $name 👋',
+                  'Hello, $name ',
                   style: GoogleFonts.poppins(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
@@ -740,13 +740,13 @@ class _HomePageState extends State<HomePage> {
         final c = categories[i];
         return GestureDetector(
           onTap: () async {
-            debugPrint('🔍 DEBUG: Category tapped: ${c['title']}');
+            debugPrint(' DEBUG: Category tapped: ${c['title']}');
             final result = await Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (_) {
                   debugPrint(
-                    '🔍 DEBUG: Building ComplaintFormScreen for ${c['title']}',
+                    ' DEBUG: Building ComplaintFormScreen for ${c['title']}',
                   );
                   return ComplaintFormScreen(
                     category: c['title'] as String,
@@ -757,7 +757,7 @@ class _HomePageState extends State<HomePage> {
             );
             // Refresh stats if complaint was successfully submitted
             if (result == true) {
-              debugPrint('✅ Complaint submitted, refreshing stats...');
+              debugPrint(' Complaint submitted, refreshing stats...');
               _fetchStatistics();
             }
           },

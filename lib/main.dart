@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'auth.dart';
 
 // ===================================================
-// 1️⃣  Base URL Configuration
+// 1⃣  Base URL Configuration
 // ===================================================
 
 String apiBaseUrl = const String.fromEnvironment(
@@ -35,7 +35,7 @@ class ApiCache {
 }
 
 // ===================================================
-// 2️⃣  Backend health check
+// 2⃣  Backend health check
 // ===================================================
 
 Future<bool> checkBackendHealth({int retries = 2}) async {
@@ -57,7 +57,7 @@ Future<bool> checkBackendHealth({int retries = 2}) async {
 }
 
 // ===================================================
-// 3️⃣  Global API client with retry logic
+// 3⃣  Global API client with retry logic
 // ===================================================
 
 class ApiClient {
@@ -72,7 +72,7 @@ class ApiClient {
       return await requestFn().timeout(_timeout);
     } catch (e) {
       if (retry < _maxRetries) {
-        debugPrint('🔁 Retrying request (${retry + 1})...');
+        debugPrint(' Retrying request (${retry + 1})...');
         await Future.delayed(const Duration(milliseconds: 500));
         return _makeRequest(requestFn, retry: retry + 1);
       }
@@ -99,7 +99,7 @@ class ApiClient {
 }
 
 // ===================================================
-// 4️⃣  App Entry
+// 4⃣  App Entry
 // ===================================================
 
 Future<void> main() async {
@@ -109,14 +109,14 @@ Future<void> main() async {
     await dotenv.load(fileName: ".env");
     apiBaseUrl = dotenv.env['API_BASE_URL'] ?? apiBaseUrl;
   } catch (e) {
-    debugPrint('⚠️ .env not found, using default API base.');
+    debugPrint(' .env not found, using default API base.');
   }
 
   runApp(const MyApp());
 }
 
 // ===================================================
-// 5️⃣  Root App
+// 5⃣  Root App
 // ===================================================
 
 class MyApp extends StatelessWidget {
@@ -138,7 +138,7 @@ class MyApp extends StatelessWidget {
 }
 
 // ===================================================
-// 6️⃣  Splash Screen (server check + transition)
+// 6⃣  Splash Screen (server check + transition)
 // ===================================================
 
 class SplashScreen extends StatefulWidget {
@@ -173,10 +173,10 @@ class _SplashScreenState extends State<SplashScreen>
     final isHealthy = await checkBackendHealth();
 
     if (isHealthy) {
-      setState(() => _status = 'Connected ✓');
+      setState(() => _status = 'Connected ');
       await ApiCache.setCachedUrl(apiBaseUrl);
     } else {
-      setState(() => _status = 'Server unreachable ⚠️');
+      setState(() => _status = 'Server unreachable ');
     }
 
     await Future.delayed(const Duration(seconds: 1));
@@ -240,9 +240,9 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Widget _statusWidget() {
-    final color = _status.contains('✓')
+    final color = _status.contains('')
         ? Colors.greenAccent
-        : _status.contains('⚠️')
+        : _status.contains('')
         ? Colors.amberAccent
         : Colors.white;
 

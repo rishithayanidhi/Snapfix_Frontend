@@ -42,10 +42,10 @@ class LocationData {
 
 /// Main location utility (optimized for production)
 class LocationService {
-  static const String _logTag = '📍[LocationService]';
+  static const String _logTag = '[LocationService]';
 
   // ----------------------------------------------------------
-  // ✅ Permission & Service Checks
+  //  Permission & Service Checks
   // ----------------------------------------------------------
 
   static Future<bool> _checkLocationServiceEnabled() async {
@@ -73,7 +73,7 @@ class LocationService {
   }
 
   // ----------------------------------------------------------
-  // ✅ Core Location Acquisition
+  //  Core Location Acquisition
   // ----------------------------------------------------------
 
   static Future<Position?> _tryGetPosition({
@@ -104,7 +104,7 @@ class LocationService {
   }
 
   // ----------------------------------------------------------
-  // ✅ Reverse Geocoding
+  //  Reverse Geocoding
   // ----------------------------------------------------------
 
   static Future<String> _getAddressFromCoordinates(
@@ -132,7 +132,7 @@ class LocationService {
   }
 
   // ----------------------------------------------------------
-  // ✅ Public Interface: get current location with address
+  //  Public Interface: get current location with address
   // ----------------------------------------------------------
 
   static Future<LocationData?> getCurrentLocationWithAddress({
@@ -196,7 +196,7 @@ class LocationService {
   }
 
   // ----------------------------------------------------------
-  // ✅ Utility Helpers
+  //  Utility Helpers
   // ----------------------------------------------------------
 
   static Future<String> getQuickLocationString() async {
