@@ -21,6 +21,7 @@ dependencies:
   # File & media handling
   file_picker: ^8.1.2
   image_picker: ^1.1.2
+  supabase_flutter: ^2.10.0
 
   # Location & maps
   geolocator: ^13.0.1
