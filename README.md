@@ -162,7 +162,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Contact
 
-**Project Maintainer**: Rishitha Yanidhi
+**Project Maintainer**: Rishithayanidhi
 
 **Backend Repository**: [Snapfix_backend](https://github.com/rishithayanidhi/Snapfix_backend)
 
