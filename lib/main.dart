@@ -11,7 +11,7 @@ import 'auth.dart';
 
 String apiBaseUrl = const String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'http://localhost:8000',
+  defaultValue: 'https://snapfix-backend.onrender.com',
 );
 
 // Optional cache for faster reconnects
@@ -61,7 +61,7 @@ Future<bool> checkBackendHealth({int retries = 2}) async {
 // ===================================================
 
 class ApiClient {
-  static const Duration _timeout = Duration(seconds: 10);
+  static const Duration _timeout = Duration(seconds: 30);
   static const int _maxRetries = 3;
 
   static Future<http.Response> _makeRequest(
